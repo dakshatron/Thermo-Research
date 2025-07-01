@@ -129,3 +129,4 @@ def main():
     extractDatabase(inputCSVPath, outputCSVPath)
 
 main()
+print("hi")
