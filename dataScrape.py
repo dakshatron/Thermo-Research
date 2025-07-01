@@ -3,6 +3,7 @@ import requests # HTML getter
 import re as regex # HTML parser
 import os # checks if file exists
 from typing import List, Dict, Optional, Tuple, Any, Union
+import pandas as pd # dealing with weird lists and datatypes
 
 # pre-compile regex patterns to make it faster
 preExpFactorPattern = regex.compile(r'(\d+\.\d+)\s*[Xx]?\s*10\s*<sup>\s*([+-]?\s*\d+)\s*</sup>', regex.IGNORECASE) # ignores alphabet case, ie. A vs. a
@@ -61,6 +62,9 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, list[str,
         return
 
     return preExpFactorCoeff, preExpFactorPower, activEnergy, reactants, products
+
+def fetchNExtract(url: str, row_index: int) -> Optional[Tuple[str, str, str, List[str, str], List[str, str]]]:
+    # fetches HTML from url in row row_index, extracts and returns tuple of parameters 
 
 def extractDatabase(inputCSVPathParam: str, outputCSVPathParam: str) -> None:
     """
