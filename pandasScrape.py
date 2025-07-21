@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Tuple, Any, Union
 
 # pre-compile regex patterns to make it faster
 preExpFactorPattern = regex.compile(r'(\d+\.\d+)\s*[Xx]?\s*10\s*<sup>\s*([+-]?\s*\d+)\s*</sup>', regex.IGNORECASE) # ignores alphabet case, ie. A vs. a
-activEnergyPattern = regex.compile(r'e\s*<sup>\s*([+-]?\d+)+\s*\[.*?\]/RT\s*</sup>', regex.IGNORECASE)
+activEnergyPattern = regex.compile(r'e\s*<sup>\s*([+-]?\d+)\s*\[.*?\]/RT\s*</sup>', regex.IGNORECASE)
 rxnPattern = regex.compile('<B>Reaction:</B>(.*?)(?:<BR>|$)', regex.IGNORECASE | regex.DOTALL)
 
 def padListToThree(inputList: List[str]) -> List[str]:
