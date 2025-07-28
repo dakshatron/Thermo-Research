@@ -3,6 +3,7 @@ import requests  # for fetching HTML from URLs
 import re as regex  # HTML parser
 import os  # checks if file exists
 from typing import List, Dict, Optional, Tuple, Any, Union
+import cirpy # for chemical name (eg. (CH_3)2(CH_2O_2)CC(O)CH_3) to SMILES conversion
 
 # pre-compile regex patterns to make it faster
 preExpFactorPattern = regex.compile(r'(\d+\.\d+)\s*[Xx]?\s*10\s*<sup>\s*([+-]?\s*\d+)\s*</sup>', regex.IGNORECASE) # ignores alphabet case, ie. A vs. a
@@ -52,6 +53,7 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         rxnHTML = rxnHTML.replace('→', '->')
         rxnHTML = rxnHTML.replace('<sub>', '_')
         rxnHTML = rxnHTML.replace('</sub>', '')
+        rxnHTML = rxnHTML.replace('â‰¡', '==')
         rxnHTML = regex.sub(r'<.*?>', '', rxnHTML) # Strip all remaining HTML tags
         rxnHTML = regex.sub(r'\s+', ' ', rxnHTML).strip()
         rxnParts = rxnHTML.split('->')
