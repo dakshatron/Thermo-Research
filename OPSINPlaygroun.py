@@ -18,24 +18,23 @@ convertedRowsList = []
 
 try:
     # Load the IUPAC data from a CSV file
-    withIUPACdataframe = pd.read_csv('IUPAC Conversion Test.csv')
+    filteredDataframe = pd.read_csv('IUPAC Conversion Test.csv')
     print("IUPAC data loaded successfully.")
 except FileNotFoundError:
     print("IUPAC data file not found. Please ensure 'checkpoint.csv' exists in the current directory.")
 
-# Select all kinetic columns at once, then apply axis=1
-kineticColumns = ['Pre-Exp Factor Coeff', 'Pre-Exp Factor Power', 'Activation Energy']
-kineticDataMask = withIUPACdataframe[kineticColumns].notna().all(axis=1) # creates mask (true false matrix) true for rows with full data
+### Select all kinetic columns at once, then apply axis=1
+# kineticColumns = ['Pre-Exp Factor Coeff', 'Pre-Exp Factor Power', 'Activation Energy']
+# kineticDataMask = withIUPACdataframe[kineticColumns].notna().all(axis=1) # creates mask (true false matrix) true for rows with full data
 
-products_mask = (withIUPACdataframe['Product 1'].fillna('').str.lower() == 'products') & \
-                (withIUPACdataframe['Product 2'].fillna('').str.strip() == '') & \
-                (withIUPACdataframe['Product 3'].fillna('').str.strip() == '')
+# products_mask = (withIUPACdataframe['Product 1'].fillna('').str.lower() == 'products') & \
+#                 (withIUPACdataframe['Product 2'].fillna('').str.strip() == '') & \
+#                 (withIUPACdataframe['Product 3'].fillna('').str.strip() == '')
 
-finalMask = kineticDataMask & ~products_mask
+# finalMask = kineticDataMask & ~products_mask
 
-filteredDataframe = withIUPACdataframe[finalMask].copy()
-filteredDataframe.insert(0, 'ID', range(1, len(filteredDataframe) + 1)) # reset index after filtering
-filteredDataframe.to_csv('IUPAC Conversion Test.csv', index=False)
+# filteredDataframe.insert(0, 'ID', range(1, len(filteredDataframe) + 1)) # reset index after filtering
+# filteredDataframe.to_csv('IUPAC Conversion Test.csv', index=False)
 
 # def iupac2smiles(iupac: str) -> Optional[str]:
 #     """
@@ -61,17 +60,10 @@ filteredDataframe.to_csv('IUPAC Conversion Test.csv', index=False)
 
 
 for rowIndex, rowContents in filteredDataframe.iterrows():
-    reactant1 = rowContents['Reactant 1']
-    reactant2 = rowContents['Reactant 2']
-    reactant3 = rowContents['Reactant 3']
-    
-    product1 = rowContents['Product 1']
-    product2 = rowContents['Product 2']
-    product3 = rowContents['Product 3']
+    columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
 
-    reagents = [reactant1, reactant2, reactant3, product1, product2, product3]
-
-    for reagent in reagents:
+    for columnName in columns2process:
+        reagent = rowContents[columnName]
         if isinstance(reagent, str):
             letters = regex.findall(r'[A-Za-z]', reagent)
             lowercaseLetters = regex.findall(r'[a-z]', reagent)
@@ -80,13 +72,13 @@ for rowIndex, rowContents in filteredDataframe.iterrows():
                 continue
 
             ratio = len(lowercaseLetters) / len(letters)
-            if ratio < 0.5: # insert structural converter when developed here
+            if ratio < 0.5:
                 continue
             if ratio == 0.5 or ratio > 0.5:
                 conversionStats['attempted'] += 1
                 try:
                     smiles = opsin.to_smiles(reagent)
-                    filteredDataframe.at[rowIndex, col] = smiles
+                    filteredDataframe.at[rowIndex, columnName] = smiles
                     convertedRowsList.append(rowIndex)
                     conversionStats['successful'] += 1
                 except Exception as e:
