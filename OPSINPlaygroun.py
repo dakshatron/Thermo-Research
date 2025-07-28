@@ -57,34 +57,39 @@ except FileNotFoundError:
 #     except Exception as e:
 #         return None
     
-
-
+usefulRows = []
 for rowIndex, rowContents in filteredDataframe.iterrows():
     columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
+    usefulBool = True
 
     for columnName in columns2process:
         reagent = rowContents[columnName]
         if isinstance(reagent, str):
             letters = regex.findall(r'[A-Za-z]', reagent)
             lowercaseLetters = regex.findall(r'[a-z]', reagent)
+            conversionStats['attempted'] += 1
 
             if len(letters) == 0 or len(lowercaseLetters) == 0:
+                usefulBool = False
+                conversionStats['failed'] += 1
                 continue
 
             ratio = len(lowercaseLetters) / len(letters)
             if ratio < 0.5:
+                usefulBool = False
+                conversionStats['failed'] += 1
                 continue
             if ratio == 0.5 or ratio > 0.5:
-                conversionStats['attempted'] += 1
                 try:
                     smiles = opsin.to_smiles(reagent)
-                    filteredDataframe.at[rowIndex, columnName] = smiles
-                    convertedRowsList.append(rowIndex)
                     conversionStats['successful'] += 1
+                    filteredDataframe.at[rowIndex, columnName] = smiles
                 except Exception as e:
                     conversionStats['failed'] += 1
+                    usefulBool = False
+    if usefulBool is True:
+        usefulRows.append(rowIndex) 
+filteredDataframe = filteredDataframe.loc[usefulRows]
 
-convertedDataframe = filteredDataframe.loc[convertedRowsList]
-
-convertedDataframe.to_csv('converted.csv', index=False)
+filteredDataframe.to_csv('converted.csv', index=False)
 print(f"Conversion statistics: {conversionStats}")
