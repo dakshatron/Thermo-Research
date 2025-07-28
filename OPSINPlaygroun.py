@@ -23,7 +23,15 @@ try:
 except FileNotFoundError:
     print("IUPAC data file not found. Please ensure 'checkpoint.csv' exists in the current directory.")
 
-for rowIndex, rowContents in withIUPACdataframe['Reactant 1'].items():
+withIUPACdataframe.insert(0, 'ID', range(1, len(withIUPACdataframe) + 1))
+
+# Select all kinetic columns at once, then apply axis=1
+kinetic_columns = ['Pre-Exp Factor Coeff', 'Pre-Exp Factor Power', 'Activation Energy']
+completeKineticMask = withIUPACdataframe[kinetic_columns].notna().all(axis=1)
+filteredDataframe = withIUPACdataframe[completeKineticMask].copy()
+
+
+for rowIndex, rowContents in filteredDataframe['Reactant 1'].items():
     letters = regex.findall(r'[A-Za-z]', rowContents)
     lowercaseLetters = regex.findall(r'[a-z]', rowContents)
 
@@ -37,12 +45,32 @@ for rowIndex, rowContents in withIUPACdataframe['Reactant 1'].items():
         conversionStats['attempted'] += 1
         try:
             smiles = opsin.to_smiles(rowContents)
-            withIUPACdataframe.loc[rowIndex, 'Reactant 1'] = smiles
+            filteredDataframe.loc[rowIndex, 'Reactant 1'] = smiles
             convertedRowsList.append(rowIndex)
             conversionStats['successful'] += 1
         except Exception as e:
             conversionStats['failed'] += 1
 
-convertedDataframe = withIUPACdataframe.loc[convertedRowsList]
+for rowIndex, rowContents in filteredDataframe['Reactant 2'].items():
+    letters = regex.findall(r'[A-Za-z]', rowContents)
+    lowercaseLetters = regex.findall(r'[a-z]', rowContents)
+
+    if len(letters) == 0 or len(lowercaseLetters) == 0:
+        continue
+
+    ratio = len(lowercaseLetters) / len(letters)
+    if ratio < 0.5:
+        continue
+    if ratio == 0.5 or ratio > 0.5:
+        conversionStats['attempted'] += 1
+        try:
+            smiles = opsin.to_smiles(rowContents)
+            filteredDataframe.loc[rowIndex, 'Reactant 1'] = smiles
+            convertedRowsList.append(rowIndex)
+            conversionStats['successful'] += 1
+        except Exception as e:
+            conversionStats['failed'] += 1
+
+convertedDataframe = filteredDataframe.loc[convertedRowsList]
 
 convertedDataframe.to_csv('converted.csv', index=False)
