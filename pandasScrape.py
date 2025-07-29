@@ -128,9 +128,11 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         return
     
     urlColumn = dataframe.columns[3] # urls in 4th column, index 3
-    preExpColumn = dataframe.columns[6]
-    activEnergyColumn = dataframe.columns[8]
-    rateConstantColumn = dataframe.columns[9]
+
+    # I'm not using the guy's data
+    # preExpColumn = dataframe.columns[6]
+    # activEnergyColumn = dataframe.columns[8]
+    # rateConstantColumn = dataframe.columns[9]
 
 
     latestAllRows = []
@@ -185,7 +187,7 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         print("Error writing to output CSV file:", e)
 
 def main():
-    inputCSVPath = 'Filtered Records.csv'
+    inputCSVPath = 'records.csv'
     outputCSVPath = 'extracted.csv'
     
     try:

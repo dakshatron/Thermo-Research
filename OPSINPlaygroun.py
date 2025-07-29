@@ -5,6 +5,7 @@ import regex  # HTML parser
 import os  # checks if file exists
 from typing import List, Dict, Optional, Tuple, Any, Union
 import cirpy # for chemical name (eg. (CH_3)2(CH_2O_2)CC(O)CH_3) to SMILES conversion
+from urllib.parse import quote
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -126,16 +127,18 @@ def structural2SMILES(structuralFormula: str) -> Optional[str]:
     except NoSuchElementException:
         return "None"
     return smiles
+        
 
 usefulRows = []
+cactusRows = []
 for rowIndex, rowContents in filteredDataframe.iterrows():
     columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
     usefulBool = True
+    cactusBool = False
 
     for columnName in columns2process:
         reagent = rowContents[columnName]
         if isinstance(reagent, str):
-            conversionStats['attempted'] += 1
             letters = regex.findall(r'[A-Za-z]', reagent)
             lowercaseLetters = regex.findall(r'[a-z]', reagent)
             
@@ -143,12 +146,15 @@ for rowIndex, rowContents in filteredDataframe.iterrows():
             if len(letters) == 0 or len(lowercaseLetters) == 0:
                 usefulBool = False
                 continue
+            conversionStats['attempted'] += 1
 
             ratio = len(lowercaseLetters) / len(letters)
-            # if ratio < 0.5:
-            #     usefulBool = False
-            #     conversionStats['failed'] += 1
-            #     continue
+
+            if ratio < 0.5:
+                cactusLink = "https://cactus.nci.nih.gov/chemical/structure/" + quote(reagent) + "/smiles"
+                filteredDataframe.at[rowIndex, columnName] = cactusLink
+                cactusBool = True
+                continue
             smiles = opsin.to_smiles(reagent)
             if smiles != None:
                 conversionStats['successful'] += 1
@@ -158,19 +164,24 @@ for rowIndex, rowContents in filteredDataframe.iterrows():
                 if smiles != None:
                     conversionStats['successful'] += 1
                     filteredDataframe.at[rowIndex, columnName] = smiles
-                else:
-                    smiles = structural2SMILES(reagent)
                     
-    if usefulBool is True:
+                    
+    if usefulBool and not cactusBool:
         usefulRows.append(rowIndex) 
+    if cactusBool is True:
+        cactusRows.append(rowIndex)
+
+cactusDataframe = filteredDataframe.loc[cactusRows].copy()
 filteredDataframe = filteredDataframe.loc[usefulRows]
 columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
 
-filteredDataframe = filteredDataframe[
-    ~filteredDataframe[columns2process].astype(str).apply(
-        lambda x: x.str.contains(r'\[None\]', na=False)
-    ).any(axis=1)
-]
+# # idrk how it does this, only chat, but it removes rows with [None] in any of the columns2process
+# filteredDataframe = filteredDataframe[
+#     ~filteredDataframe[columns2process].astype(str).apply(
+#         lambda x: x.str.contains(r'\[None\]', na=False)
+#     ).any(axis=1)
+# ]
 
 filteredDataframe.to_csv('converted.csv', index=False)
+cactusDataframe.to_csv('cactus.csv', index=False)
 print(f"Conversion statistics: {conversionStats}")
