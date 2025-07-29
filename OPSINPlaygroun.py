@@ -35,27 +35,6 @@ except FileNotFoundError:
 
 # filteredDataframe.insert(0, 'ID', range(1, len(filteredDataframe) + 1)) # reset index after filtering
 # filteredDataframe.to_csv('IUPAC Conversion Test.csv', index=False)
-
-# def iupac2smiles(iupac: str) -> Optional[str]:
-#     """
-#     Converts an IUPAC name to a SMILES string using OPSIN.
-    
-#     Args:
-#         iupac (str): The IUPAC name to convert.
-        
-#     Returns:
-#         Optional[str]: The SMILES string if conversion is successful, None otherwise.
-#     """
-#     letters = regex.findall(r'[A-Za-z]', rowContents)
-#     lowercaseLetters = regex.findall(r'[a-z]', rowContents)
-
-#     if len(letters) == 0 or len(lowercaseLetters) == 0:
-#         continue
-#     try:
-#         smiles = opsin.to_smiles(iupac)
-#         return smiles
-#     except Exception as e:
-#         return None
     
 usefulRows = []
 for rowIndex, rowContents in filteredDataframe.iterrows():
@@ -65,31 +44,42 @@ for rowIndex, rowContents in filteredDataframe.iterrows():
     for columnName in columns2process:
         reagent = rowContents[columnName]
         if isinstance(reagent, str):
+            conversionStats['attempted'] += 1
             letters = regex.findall(r'[A-Za-z]', reagent)
             lowercaseLetters = regex.findall(r'[a-z]', reagent)
-            conversionStats['attempted'] += 1
+            
 
             if len(letters) == 0 or len(lowercaseLetters) == 0:
                 usefulBool = False
-                conversionStats['failed'] += 1
                 continue
 
             ratio = len(lowercaseLetters) / len(letters)
-            if ratio < 0.5:
-                usefulBool = False
-                conversionStats['failed'] += 1
-                continue
-            if ratio == 0.5 or ratio > 0.5:
-                try:
-                    smiles = opsin.to_smiles(reagent)
+            # if ratio < 0.5:
+            #     usefulBool = False
+            #     conversionStats['failed'] += 1
+            #     continue
+            smiles = opsin.to_smiles(reagent)
+            if smiles != None:
+                conversionStats['successful'] += 1
+                filteredDataframe.at[rowIndex, columnName] = smiles
+            else:
+                smiles = cirpy.resolve(reagent, 'smiles')
+                if smiles != None:
                     conversionStats['successful'] += 1
                     filteredDataframe.at[rowIndex, columnName] = smiles
-                except Exception as e:
+                else:
                     conversionStats['failed'] += 1
                     usefulBool = False
     if usefulBool is True:
         usefulRows.append(rowIndex) 
 filteredDataframe = filteredDataframe.loc[usefulRows]
+columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
+
+filteredDataframe = filteredDataframe[
+    ~filteredDataframe[columns2process].astype(str).apply(
+        lambda x: x.str.contains(r'\[None\]', na=False)
+    ).any(axis=1)
+]
 
 filteredDataframe.to_csv('converted.csv', index=False)
 print(f"Conversion statistics: {conversionStats}")
