@@ -185,8 +185,8 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         print("Error writing to output CSV file:", e)
 
 def main():
-    inputCSVPath = 'Filtered Records.csv'
-    outputCSVPath = 'extracted.csv'
+    inputCSVPath = 'records.csv'
+    outputCSVPath = 'new extracted.csv'
     
     try:
         scrapeDatabaseWithPandas(inputCSVPath, outputCSVPath)

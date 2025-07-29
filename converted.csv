@@ -32,6 +32,8 @@ ID,Pre-Exp Factor Coeff,Pre-Exp Factor Power,Activation Energy,Reactant 1,Reacta
 660,2.43,10,-152986,['FC1=CC=C(C(=O)OC(C)(C)C)C=C1'],,,['C=C(C)C'],['FC1=CC=C(C(=O)O)C=C1'],
 661,2.95,11,-166289,['COC=1C=C(C(=O)OC(C)(C)C)C=CC1'],,,['C=C(C)C'],['COC=1C=C(C(=O)O)C=CC1'],
 682,3.89,14,-207862,['CC(C)(OC1=CC=C(C=C1)N)C'],,,['C=C(C)C'],['NC1=CC=C(C=C1)O'],
+776,2.19,13,-242783,['C12C(CCC(C2O1)([2H])[2H])([2H])[2H]'],,,['C1(C=C(CCC1([2H])[2H])[2H])O[2H]'],,
+777,7.24,14,-256917,['C12C(CCC(C2O1)([2H])[2H])([2H])[2H]'],,,['C1(C(CCC(C1)([2H])[2H])([2H])[2H])=O'],,
 824,2.0,11,-174604,['CC(C)(C)NC(C1=CC(=CC=C1)OC)=O'],,,['C=C(C)C'],['COC=1C=C(C(=O)N)C=CC1'],
 826,7.76,13,-191233,['C(=C)C1(CC1)OC'],,,['COC1=CCCC1'],,
 827,2.71,13,-187076,['C(=C)C1(CC1)OC'],,,['COC1=CCCC1'],,
