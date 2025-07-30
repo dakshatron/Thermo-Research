@@ -8,12 +8,12 @@ import cirpy # for chemical name (eg. (CH_3)2(CH_2O_2)CC(O)CH_3) to SMILES conve
 # pre-compile regex patterns to make it faster
 preExpFactorPattern = regex.compile(r'(\d+\.\d+)\s*[Xx]?\s*10\s*<sup>\s*([+-]?\s*\d+)\s*</sup>', regex.IGNORECASE) # ignores alphabet case, ie. A vs. a
 activEnergyPattern = regex.compile(r'e\s*<sup>\s*([+-]?\d+)\s*\[.*?\]/RT\s*</sup>', regex.IGNORECASE)
-rxnPattern = regex.compile('<B>Reaction:</B>(.*?)(?:<BR>|$)', regex.IGNORECASE | regex.DOTALL)
+rxnPattern = regex.compile(r'<B>Reaction:</B>(.*?)(?:<BR>|$)', regex.IGNORECASE | regex.DOTALL)
+temperaturePattern = regex.compile(r'<B>Temperature:</B>\s*(?:&nbsp;)*\s*([0-9]+(?:\.?[0-9]*)?\s*K?)(?:\s*-\s*([0-9]+(?:\.?[0-9]*)?\s*K?))?', regex.IGNORECASE)
+reactionOrderPattern = regex.compile(r'<B>Reaction\s+Order:</B>\s*(?:&nbsp;|\s)*(\d)', regex.IGNORECASE)
+tempRatioExpPattern = regex.compile(r'\(T\s*/298 \s* K\) \s* <sup> (-?\d+)', regex.IGNORECASE)
 
-def padListToThree(inputList: List[str]) -> List[str]:
-    return inputList + ([''] * (3 - len(inputList)))
-
-def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str], List[str]]]:
+def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str], List[str], str]]:
     """
     Extracts parameters from the HTML content (given as plain text) of a reaction page.
     
@@ -28,16 +28,34 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         - reactants (List[str]): List of reactants as strings
         - products (List[str]): List of products as strings
     """
-    preExpFactorCoeff = None
-    preExpFactorPower = None
-    activEnergy = None
-    reactants = []
-    products = []
+    preExpFactorCoeff = ''
+    preExpFactorPower = ''
+    activEnergy = ''
+    temperature = ''
+    reactionOrder = ''
+    tempRatioExp = ''
+    reactants = ['', '', '']
+    reactantsRaw = []
+    products = ['', '', '']
+    productsRaw = []
+    rxnParts = []
     
+    temperatureMatchObj = regex.search(temperaturePattern, pageHTMLParam)
+    if temperatureMatchObj:
+        temperature = temperatureMatchObj.group(1).strip()
+
+    reactionOrderMatchObj = regex.search(reactionOrderPattern, pageHTMLParam)
+    if reactionOrderMatchObj:
+        reactionOrder = reactionOrderMatchObj.group(1).strip()
+
+    tempRatioExpMatchObj = regex.search(tempRatioExpPattern, pageHTMLParam)
+    if tempRatioExpMatchObj:
+        tempRatioExp = tempRatioExpMatchObj.group(1).strip()
+
     preExpFactorMatchObj = regex.search(preExpFactorPattern, pageHTMLParam)
     if preExpFactorMatchObj:
         preExpFactorCoeff = preExpFactorMatchObj.group(1).strip()
-        preExpFactorPower = preExpFactorMatchObj.group(2).strip()
+        preExpFactorPower = preExpFactorMatchObj.group(2).strip() #(2) refers to second capturing group, ie. second set of brackets (what regex actually 'captures')
     
     activEnergyMatchObj = regex.search(activEnergyPattern, pageHTMLParam)
     if activEnergyMatchObj:
@@ -49,7 +67,12 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         # Clean and normalize the reaction HTML string
         rxnHTML = rxnMatchObj.group(1).strip()
         rxnHTML = rxnHTML.replace('&nbsp;', ' ')
+        rxnHTML = rxnHTML.replace('&plus;', '+')
+        rxnHTML = rxnHTML.replace('&plus', '+')
         rxnHTML = rxnHTML.replace('&middot;', '(.)')
+        rxnHTML = rxnHTML.replace('((.))', '(.)')
+        rxnHTML = rxnHTML.replace('⇒', '->')
+        rxnHTML = rxnHTML.replace('⟶', '->')
         rxnHTML = rxnHTML.replace('→', '->')
         rxnHTML = rxnHTML.replace('<sub>', '')
         rxnHTML = rxnHTML.replace('</sub>', '')
@@ -59,25 +82,32 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         rxnParts = rxnHTML.split('->')
 
         # split rxn, then split reactants and products
-        reactants = rxnParts[0].split('+')
-        products = rxnParts[1].split('+')
-        reactants = padListToThree(reactants)
-        products = padListToThree(products)
+        if len(rxnParts) >= 2:
+            reactantsRaw = rxnParts[0].split('+')
+            productsRaw = rxnParts[1].split('+')
+        else:
+            return ('Parse Error',) * 10
+        
+        for i in range(3):
+            if len(reactantsRaw) > i:
+                reactants[i] = reactantsRaw[i]
+            if len(productsRaw) > i:
+                products[i] = productsRaw[i]
+
         reactants = [r.strip() for r in reactants]
         products = [p.strip() for p in products]
-    else:
-        reactants = ['', '', '']
-        products = ['', '', '']
 
 
     
 
     firstReactant = rxnParts
     print(rxnParts)
+    print(reactants)
+    print(products)
     
-    return preExpFactorCoeff, preExpFactorPower, activEnergy, reactants[0], reactants[2], reactants[2], products[0], products[1], products[2] 
+    return preExpFactorCoeff, preExpFactorPower, activEnergy, reactants[0], reactants[1], reactants[2], products[0], products[1], products[2], temperature, reactionOrder, tempRatioExp 
 
-def fetchAndExtract(url: str, rowIndex: int) -> Optional[Tuple[str, str, str, str, str, str, str, str, str]]:
+def fetchAndExtract(url: str, rowIndex: int) -> Optional[Tuple[str, str, str, str, str, str, str, str, str, str, str]]:
     """
     Gets url from overarching function, extracts with extractParams
     
@@ -101,11 +131,11 @@ def fetchAndExtract(url: str, rowIndex: int) -> Optional[Tuple[str, str, str, st
         extractedParams = extractParams(pageHTML)
         if extractedParams:
             return extractedParams
-        else:
-            return ('Parse Error',) * 5
+        elif not extractedParams or len(extractedParams) != 10:
+            return ('Parse Error',) * 10
     except requests.RequestException as e:
         print(f"Error fetching URL at row {rowIndex + 1}: {e}")
-        return ('Url Fetch Error',) * 5
+        return ('Url Fetch Error',) * 10
 
 def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
     """
@@ -134,10 +164,22 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
     # activEnergyColumn = dataframe.columns[8]
     # rateConstantColumn = dataframe.columns[9]
 
-
+    columns2keep = [
+        dataframe.columns[0],
+        dataframe.columns[1],
+        dataframe.columns[3],
+        dataframe.columns[11]
+        ]
     latestAllRows = []
     checkpointInterval = 50 # save every 50 rows
     checkpointPath = 'checkpoint.csv'
+    columns2keep = [
+        'RecordID',
+        'RID',
+        'Squib',
+        'ReactionOrder'
+    ]
+    originalDataSubset = dataframe[columns2keep].copy()
     newColumnNames = [
         'Pre-Exp Factor Coeff',
         'Pre-Exp Factor Power',
@@ -147,7 +189,10 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         'Reactant 3',
         'Product 1',
         'Product 2',
-        'Product 3'
+        'Product 3',
+        'Temperature',
+        'Reaction Order',
+        'Temperature Ratio Exponent'
     ]
 
     for rowIndex, row in dataframe.iterrows():
@@ -158,9 +203,26 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         latestAllRows.append(extractedParams)
 
         if (len(latestAllRows) % checkpointInterval == 0):
-            temporaryDataframe = pd.DataFrame(latestAllRows, columns=newColumnNames)
-            temporaryDataframe.to_csv(checkpointPath, index=False, encoding='utf-8')
-            print(f"Checkpoint saved at {len(latestAllRows)} rows.")
+            try:
+                # Get processed rows from original subset
+                processedOriginalRows = originalDataSubset.iloc[:len(latestAllRows)]
+                
+                # Create extracted dataframe
+                extractedDataframe = pd.DataFrame(latestAllRows, columns=newColumnNames)
+                
+                # Combine selected original columns with extracted data
+                combinedDataframe = pd.concat([
+                    processedOriginalRows.reset_index(drop=True), 
+                    extractedDataframe
+                ], axis=1)
+                
+                # Save checkpoint
+                combinedDataframe.to_csv(checkpointPath, index=False, encoding='utf-8')
+                print(f"Checkpoint saved at {len(latestAllRows)} rows with {combinedDataframe.shape[1]} columns.")
+                
+            except Exception as e:
+                print(f"Checkpoint save failed: {e}")
+
 
 
         # --- Start of the simple progress logic ---
@@ -177,6 +239,8 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
     
 
     extractedDataframe = pd.DataFrame(latestAllRows, columns = newColumnNames)
+
+    
 
     finalDataframe = pd.concat([dataframe, extractedDataframe], axis=1)
 
