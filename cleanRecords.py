@@ -9,5 +9,6 @@ columns2check = [
 ]
 
 filteredDataframe = unfilteredDataframe[~unfilteredDataframe[columns2check].isnull().all(axis=1)]
+filteredDataframe = filteredDataframe[~filteredDataframe['Product 1'].str.strip().str.lower().eq('products')]
 
 filteredDataframe.to_csv('Filtered NIST Extracted.csv', index=False)
