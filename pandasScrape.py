@@ -2,7 +2,7 @@ import pandas as pd  # dealing with weird lists and datatypes
 import requests  # for fetching HTML from URLs
 import re as regex  # HTML parser
 import os  # checks if file exists
-from typing import List, Dict, Optional, Tuple, Any, Union
+from typing import List, Dict, Optional, Tuple, Any, Union # allows specification of datatype 
 import cirpy # for chemical name (eg. (CH_3)2(CH_2O_2)CC(O)CH_3) to SMILES conversion
 
 # pre-compile regex patterns to make it faster
@@ -42,7 +42,7 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
     
     temperatureMatchObj = regex.search(temperaturePattern, pageHTMLParam)
     if temperatureMatchObj:
-        temperature = temperatureMatchObj.group(1).strip()
+        temperature = temperatureMatchObj.group(1).strip() # (1) refers to first 'capturing group' (regex only captures stuff inside ()s, called capturing groups)
 
     reactionOrderMatchObj = regex.search(reactionOrderPattern, pageHTMLParam)
     if reactionOrderMatchObj:
@@ -55,7 +55,7 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
     preExpFactorMatchObj = regex.search(preExpFactorPattern, pageHTMLParam)
     if preExpFactorMatchObj:
         preExpFactorCoeff = preExpFactorMatchObj.group(1).strip()
-        preExpFactorPower = preExpFactorMatchObj.group(2).strip() #(2) refers to second capturing group, ie. second set of brackets (what regex actually 'captures')
+        preExpFactorPower = preExpFactorMatchObj.group(2).strip()
     
     activEnergyMatchObj = regex.search(activEnergyPattern, pageHTMLParam)
     if activEnergyMatchObj:
@@ -88,6 +88,7 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         else:
             return ('Parse Error',) * 10
         
+        # replaces empty entries of reactants list; doing this to avoid out of index error
         for i in range(3):
             if len(reactantsRaw) > i:
                 reactants[i] = reactantsRaw[i]
@@ -97,10 +98,6 @@ def extractParams(pageHTMLParam: str) -> Optional[Tuple[str, str, str, List[str]
         reactants = [r.strip() for r in reactants]
         products = [p.strip() for p in products]
 
-
-    
-
-    firstReactant = rxnParts
     print(rxnParts)
     print(reactants)
     print(products)
@@ -112,7 +109,7 @@ def fetchAndExtract(url: str, rowIndex: int) -> Optional[Tuple[str, str, str, st
     Gets url from overarching function, extracts with extractParams
     
     Args:
-        url (str): reaction page url
+        url (str): reaction page url from NIST 
         rowIndex (int): index of row in dataframe
 
     Returns:
@@ -126,7 +123,7 @@ def fetchAndExtract(url: str, rowIndex: int) -> Optional[Tuple[str, str, str, st
     try:
         response = requests.get(url)
         response.raise_for_status()  # Raise an error for bad responses
-        pageHTML = response.text
+        pageHTML = response.text # turns it into a string so regex can parse
         
         extractedParams = extractParams(pageHTML)
         if extractedParams:
@@ -142,7 +139,7 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
     Tells fetchAndExtract what url to parse iteratively, saving to new file
 
     Args:
-        inputCSVPath (str): original web scrape file with links and other data
+        inputCSVPath (str): original 'NIST Records.csv' file from the dude on github, with links and other data
         outputCSVPath (str): fresh file
     """
     if not os.path.exists(inputCSVPath):
@@ -159,20 +156,11 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
     
     urlColumn = dataframe.columns[3] # urls in 4th column, index 3
 
-    # I'm not using the guy's data
-    # preExpColumn = dataframe.columns[6]
-    # activEnergyColumn = dataframe.columns[8]
-    # rateConstantColumn = dataframe.columns[9]
-
-    columns2keep = [
-        dataframe.columns[0],
-        dataframe.columns[1],
-        dataframe.columns[3],
-        dataframe.columns[11]
-        ]
-    latestAllRows = []
+    latestAllRows = [] # temporary array I save to every time
     checkpointInterval = 50 # save every 50 rows
     checkpointPath = 'checkpoint.csv'
+
+    # for cross reference with original 'NIST Records.csv' file
     columns2keep = [
         'RecordID',
         'RID',
@@ -195,22 +183,21 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         'Temperature Ratio Exponent'
     ]
 
-    for rowIndex, row in dataframe.iterrows():
-    # Now you can access any column in this row:
+    for rowIndex, rowContents in dataframe.iterrows():
 
-        url = row[urlColumn]
+        url = rowContents[urlColumn]
         extractedParams = fetchAndExtract(url, rowIndex)
         latestAllRows.append(extractedParams)
 
-        if (len(latestAllRows) % checkpointInterval == 0):
+        if (len(latestAllRows) % checkpointInterval == 0): # if divisible by checkpoint, save
             try:
-                # Get processed rows from original subset
+                # get processed rows from original subset, works like a mask i think
                 processedOriginalRows = originalDataSubset.iloc[:len(latestAllRows)]
                 
                 # Create extracted dataframe
                 extractedDataframe = pd.DataFrame(latestAllRows, columns=newColumnNames)
                 
-                # Combine selected original columns with extracted data
+                # Combine extracted dataframe with stuff I want to keep from old
                 combinedDataframe = pd.concat([
                     processedOriginalRows.reset_index(drop=True), 
                     extractedDataframe
@@ -223,11 +210,6 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
             except Exception as e:
                 print(f"Checkpoint save failed: {e}")
 
-
-
-        # --- Start of the simple progress logic ---
-        
-        # Get the human-readable row number (starts at 1)
         rowNumber = rowIndex + 1
         
         # Check if the row number is exactly one of our milestones
@@ -236,22 +218,20 @@ def scrapeDatabaseWithPandas(inputCSVPath: str, outputCSVPath: str) -> None:
         if rowNumber % 100 == 0:
             print(f"--- Milestone: '{rowNumber}' links scraped")
 
-    
-
-    extractedDataframe = pd.DataFrame(latestAllRows, columns = newColumnNames)
+    extractedDataframe = pd.DataFrame(latestAllRows, columns = newColumnNames) # I think it already was a dataframe but this made it work soooo
 
     
 
-    finalDataframe = pd.concat([dataframe, extractedDataframe], axis=1)
+    # finalDataframe = pd.concat([dataframe, extractedDataframe], axis=1) # this is wrong, extracted has duplicate junk
 
     try:
-        finalDataframe.to_csv(outputCSVPath, index=False, encoding='utf-8')
+        extractedDataframe.to_csv(outputCSVPath, index=False, encoding='utf-8')
         print("Extraction complete")
     except Exception as e:
         print("Error writing to output CSV file:", e)
 
 def main():
-    inputCSVPath = 'records.csv'
+    inputCSVPath = 'NIST Records.csv'
     outputCSVPath = 'extracted.csv'
     
     try:

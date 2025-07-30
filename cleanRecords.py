@@ -1,7 +1,7 @@
 import pandas as pd
 import csv
 
-recordsDataframe = pd.read_csv("records.csv")
+recordsDataframe = pd.read_csv("NIST Extracted.csv")
 usefulRows = []
 
 for rowIndex, rowContents in recordsDataframe.iterrows():
