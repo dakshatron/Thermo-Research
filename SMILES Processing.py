@@ -77,7 +77,7 @@ driver = webdriver.Chrome(options=myOptions)
 test_urls = [
     "https://www.google.com",
     "https://httpbin.org/get",  # Simple test endpoint
-    "https://pubchem.ncbi.nlm.nih.gov"  # Your target site
+    "https://pubchem.ncbi.nlm.nih.gov/CH3OH"  # Your target site
 ]
 
 for url in test_urls:

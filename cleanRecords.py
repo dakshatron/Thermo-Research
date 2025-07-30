@@ -1,16 +1,13 @@
-import pandas as pd
-import csv
+import pandas
 
-recordsDataframe = pd.read_csv("NIST Extracted.csv")
-usefulRows = []
+unfilteredDataframe = pandas.read_csv('NIST Extracted.csv')
 
-for rowIndex, rowContents in recordsDataframe.iterrows():
-    rowContentsStrings = [str(x).strip() for x in rowContents.values]
-    useless = any((val in ['NaN', '#NUM!', 'Products', 'Adducts', 'products', 'adducts', 'nan', 'None'] for val in rowContentsStrings))
+columns2check = [
+    'Pre-Exp Factor Coeff',
+    'Pre-Exp Factor Power',
+    'Activation Energy'
+]
 
-    if not useless:
-        usefulRows.append(rowIndex)
+filteredDataframe = unfilteredDataframe[~unfilteredDataframe[columns2check].isnull().all(axis=1)]
 
-mask = recordsDataframe.index.isin(usefulRows)
-filteredDataframe = recordsDataframe[mask].reset_index(drop=True)
-filteredDataframe.to_csv('Filtered Records.csv', index=False)
+filteredDataframe.to_csv('Filtered NIST Extracted.csv', index=False)
