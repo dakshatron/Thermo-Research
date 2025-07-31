@@ -2,7 +2,7 @@ import pandas
 import requests
 import regex
 import os
-import typing
+from typing import List, Dict, Optional, Tuple, Any, Union # allows specification of datatype 
 from urllib.parse import quote
 
 import cirpy
@@ -19,27 +19,31 @@ from selenium.common.exceptions import WebDriverException, TimeoutException, NoS
 import time
 
 
-# sets up Selenium, this is all Chat idk, it just works lol
-myOptions = Options()
-# myOptions.add_argument("--headless") # I want to see it go to the page right now
-myOptions.add_argument("--no-sandbox")
-myOptions.add_argument("--disable-dev-shm-usage")
-myOptions.add_argument("--disable-gpu")
-myOptions.add_argument("--disable-extensions")
+# # sets up Selenium, this is all Chat idk, it just works lol
+# myOptions = Options()
+# # myOptions.add_argument("--headless") # I want to see it go to the page right now
+# myOptions.add_argument("--no-sandbox")
+# myOptions.add_argument("--disable-dev-shm-usage")
+# myOptions.add_argument("--disable-gpu")
+# myOptions.add_argument("--disable-extensions")
 
-# Network and automation options
-myOptions.add_argument("--remote-debugging-port=9222")
-myOptions.add_argument("--disable-background-networking")
-myOptions.add_argument("--disable-background-timer-throttling")
-myOptions.add_argument("--disable-renderer-backgrounding")
-myOptions.add_argument("--disable-backgrounding-occluded-windows")
-myOptions.add_argument("--remote-allow-origins=*")
+# # Network and automation options
+# myOptions.add_argument("--remote-debugging-port=9222")
+# myOptions.add_argument("--disable-background-networking")
+# myOptions.add_argument("--disable-background-timer-throttling")
+# myOptions.add_argument("--disable-renderer-backgrounding")
+# myOptions.add_argument("--disable-backgrounding-occluded-windows")
+# myOptions.add_argument("--remote-allow-origins=*")
 
-driver = webdriver.Chrome(options=myOptions)
+# driver = webdriver.Chrome(options=myOptions)
 
 conversionStats = {'attempted': 0, 'successful': 0, 'failed': 0} # dictionary I increment
 
-rawDataframe = pandas.read_csv('NIST Extracted.csv')
+rawDataframe = pandas.read_csv('Filtered NIST Extracted.csv')
+processedDataframe = rawDataframe.copy()
+cactusDataframe = rawDataframe.copy()
+pubchemDataframe = rawDataframe.copy()
+manualProcessingDataframe = rawDataframe.copy()
 
 opsinObj = opsin()
 
@@ -49,26 +53,27 @@ def IUPAC2SMILES(reagentParam: str, rowIndexParam: int, columnNameParam: str) ->
 
     useful rows save to 
     """
-    usefulRowBoolParam = True
-    smiles = opsinObj.to_smiles(reagentParam )
-    if smiles != None:
-        conversionStats['successful'] += 1
-        rawDataframe.at[rowIndexParam, columnNameParam] = smiles
-    else:
+    global processedDataframe, manualProcessingDataframe, conversionStats
+    try:
+        smiles = opsinObj.to_smiles(reagentParam)
+        if smiles != None:
+            conversionStats['successful'] += 1
+            processedDataframe.at[rowIndexParam, columnNameParam] = smiles
+            return True
+        # try cirpy as a fallback
         smiles = cirpy.resolve(reagentParam, 'smiles')
         if smiles!= None:
             conversionStats['successful'] += 1
-            rawDataframe.at[rowIndexParam, columnNameParam] = smiles
-        else:
-            conversionStats['failed'] += 1
-            usefulRowBoolParam = False
-    
-    return usefulRowBoolParam
+            processedDataframe.at[rowIndexParam, columnNameParam] = smiles
+            return True
+        conversionStats['failed'] += 1
+        return False
+    except Exception as e:
+        conversionStats['failed'] += 1
+        return False
 
-cactusDataframe = pandas.read_csv('NIST Extracted.csv')
-pubchemDataframe = pandas.read_csv('NIST Extracted.csv')
-
-def struct2SMILES(reagentParam: str, rowIndexParam: int, columnNameParam: str) -> bool:
+def struct2SMILES(reagentParam: str, rowIndexParam: int, columnNameParam: str):
+    global cactusDataframe, pubchemDataframe
     # replaces entry with cactus.gov/reagentParam/smiles and pubchem/compound/reagent in two different pandas dataframes
     cactusLink = "https://cactus.nci.nih.gov/chemical/structure/" + quote(reagentParam) + "/smiles"
     cactusDataframe.at[rowIndexParam, columnNameParam] = cactusLink
@@ -76,59 +81,78 @@ def struct2SMILES(reagentParam: str, rowIndexParam: int, columnNameParam: str) -
     pubchemLink = "https://pubchem.ncbi.nlm.nih.gov/compound/" + quote(reagentParam)
     pubchemDataframe.at[rowIndexParam, columnNameParam] = pubchemLink
 
-    unprocessedRowBoolParam = True
+    return
 
-    return unprocessedRowBoolParam
-
-
+relevantRows: list = []
 for rowIndex, rowContents in rawDataframe.iterrows():
     columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
-
-    usefulRowBool = True
-    unprocessedRowBool = False
-
-    usefulRows: list = []
-    unprocessedRows: list = []
+    relevantRowBool = False
 
     for columnName in columns2process:
-        reagent = rowContents[columnName]
-        if not isinstance(reagent, str):
-            continue
+        reagent = str(rowContents[columnName])
+
+        if not isinstance(reagent, str) or reagent.strip() == '': # skip if nothing there
+            continue # onto next cell to the right
         
+        letters = regex.findall(r'[A-Za-z]', reagent)
+        lowercaseLetters = regex.findall(r'[a-z]', reagent)
         # simple, IUPAC names (eg. 2-methylpentante) have mostly lowercase letters, 
         # structural formulas have at most 1/2 lowercase letters (eg. AlBr)
         # so that's how I sort them
-        letters = regex.findall(r'[A-Za-z]', reagent)
-        lowercaseLetters = regex.findall(r'[a-z]', reagent)
-
-        if len(letters) == 0 or len(lowercaseLetters) == 0:
-            continue
-
         conversionStats['attempted'] += 1
 
+        if len(letters) == 0:
+            continue
         ratio = len(lowercaseLetters) / len(letters)
-
+        
         if ratio < 0.5:
-            unprocessedRowBool = struct2SMILES(reagent, rowIndex, columnName)
+            struct2SMILES(reagent, rowIndex, columnName)
             continue
         else:
-            usefulRowBool = IUPAC2SMILES(reagent, rowIndex, columnName)
-            continue
-    if usefulRowBool and not unprocessedRowBool:
-        usefulRows.append(rowIndex)
-    if unprocessedRowBool:
-        unprocessedRows.append(rowIndex)
+            relevantRowBool = True
+    if relevantRowBool:
+        relevantRows.append(rowIndex)
 
-cactusDataframe = cactusDataframe.loc[unprocessedRows]
-pubchemDataframe = pubchemDataframe.loc[unprocessedRows]
-processedDataframe = rawDataframe.loc[usefulRows]
+pubchemDataframe = pubchemDataframe.loc[relevantRows]
+cactusDataframe = cactusDataframe.loc[relevantRows]
 
-cactusDataframe.to_csv('cactus.csv', index=False)
 pubchemDataframe.to_csv('pubchem.csv', index=False)
-processedDataframe.to_csv('processed.csv', index=False)
+cactusDataframe.to_csv('cactus.csv', index=False)
 
+processedRows: list = []
+rawRows: list = []
+for rowIndex, rowContents in rawDataframe.iterrows():
+    columns2process = ['Reactant 1', 'Reactant 2', 'Reactant 3', 'Product 1', 'Product 2', 'Product 3']
+    processedRowBool = False
 
+    for columnName in columns2process:
+        reagent = rowContents[columnName]
 
+        if not isinstance(reagent, str) or reagent.strip() == '': # skip if nothing there
+            continue # onto next cell to the right
         
+        letters = regex.findall(r'[A-Za-z]', reagent)
+        lowercaseLetters = regex.findall(r'[a-z]', reagent)
+        # simple, IUPAC names (eg. 2-methylpentante) have mostly lowercase letters, 
+        # structural formulas have at most 1/2 lowercase letters (eg. AlBr)
+        # so that's how I sort them
+        conversionStats['attempted'] += 1
 
-    
+        if len(letters) == 0:
+            continue
+        ratio = len(lowercaseLetters) / len(letters)
+
+        if ratio >= 0.5:
+            processedRowBool = IUPAC2SMILES(reagent, rowIndex, columnName)
+            continue
+    if processedRowBool:
+        processedRows.append(rowIndex)
+    else:
+        rawRows.append(rowIndex)
+
+processedDataframe = processedDataframe.loc[processedRows]
+manualProcessingDataframe = manualProcessingDataframe.loc[rawRows]
+
+processedDataframe.to_csv('processed.csv', index=False)
+manualProcessingDataframe.to_csv('unprocessed.csv', index=False)
+

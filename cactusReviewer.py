@@ -1,6 +1,9 @@
 import pandas
 import numpy as np
 import typing
+import pubchempy
+
+
 
 cactusDataframe = pandas.read_csv('cactus.csv')
 
