@@ -13,7 +13,7 @@ The database and publication links are here:
 
 
 In /Web Scraping, you can find my pandas/regex programs that I used to scrape:
-- the NIST Reaction Kinetics database, found here: 
+- the NIST Reaction Kinetics database
 - working on extracting SMILES from cactus.nih.gov/
 - working on extracting SMILES from pubchem.gov/ using Selenium to automate scraping dynamic/Java based webpages
 
